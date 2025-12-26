@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Snoopy 家庭超慢跑</title>
+    <title>家庭超慢跑</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -129,8 +129,8 @@
                 id: 'B', 
                 name: '媽媽', 
                 role: 'Belle',
-                // 建議圖片：https://i.pinimg.com/1200x/9d/bc/86/9dbc868a7e1bd2b97729db58476bd289.jpg
-                avatar: 'https://i.pinimg.com/1200x/9d/bc/86/9dbc868a7e1bd2b97729db58476bd289.jpg', 
+                // 建議圖片：https://i.pinimg.com/736x/b6/d5/03/b6d5038fb18cb33f5dfbfbdd85558727.jpg
+                avatar: 'https://i.pinimg.com/736x/b6/d5/03/b6d5038fb18cb33f5dfbfbdd85558727.jpg', 
                 theme: 'rose', 
                 totalTime: 0, 
                 totalSteps: 0 
@@ -519,14 +519,17 @@
                     <div className={`p-5 rounded-2xl relative overflow-hidden ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white shadow-lg shadow-indigo-100/50'}`}>
                         <div className="flex justify-between items-end mb-4 relative z-10">
                             <div>
-                                <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-400'}`}>全家目標進度</p>
+                                <div className={`flex items-center text-xs font-semibold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-400'}`}>
+                                    <Icons.Trophy size={14} className="mr-1" />
+                                    <span>全家目標進度</span>
+                                </div>
                                 <div className="flex items-baseline space-x-1">
                                     <span className="text-3xl font-bold font-mono">{totalFamilyMinutes}</span>
                                     <span className="text-sm text-gray-500">/ {FAMILY_GOAL_MINUTES} 分</span>
                                 </div>
                             </div>
                             <div className={`h-10 w-10 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-700 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
-                                <Icons.Trophy size={20} />
+                                <Icons.BarChart3 size={20} />
                             </div>
                         </div>
                         <div className={`w-full h-2 rounded-full mb-1 ${darkMode ? 'bg-slate-700' : 'bg-gray-100'}`}>
