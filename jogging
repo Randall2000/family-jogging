@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Snoopy 家庭超慢跑</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* 自定義動畫 */
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+            animation: spin-slow 60s linear infinite;
+        }
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fade-in 0.5s ease-out forwards;
+        }
+        /* 隱藏捲軸但保留功能 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+    
+    <script>
+        // Tailwind 設定
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Noto Sans TC', 'Microsoft JhengHei', 'sans-serif'],
+                        mono: ['Courier New', 'monospace'],
+                    },
+                    colors: {
+                        snoopy: {
+                            white: '#FFFFFF',
+                            black: '#000000',
+                            woodstock: '#FFD700',
+                            belle: '#FF69B4'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 dark:bg-slate-900 transition-colors duration-300">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- 圖示組件 (SVG Paths) ---
+        const Icon = ({ path, size = 24, className = "", fill = "none", stroke = "currentColor" }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill={fill} 
+                stroke={stroke} 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                {path}
+            </svg>
+        );
+
+        const Icons = {
+            Play: (props) => <Icon path={<polygon points="5 3 19 12 5 21 5 3"></polygon>} {...props} />,
+            Square: (props) => <Icon path={<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>} {...props} />,
+            Trophy: (props) => <Icon path={<><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17"></path><path d="M14 14.66V17"></path><path d="M18 2h-4a4 4 0 0 0-8 0H2a2 2 0 0 0-2 2v1a4 4 0 0 0 4 4h0a5 5 0 0 0 5 8h6a5 5 0 0 0 5-8h0a4 4 0 0 0 4-4v-1a2 2 0 0 0-2-2"></path></>} {...props} />,
+            CheckCircle: (props) => <Icon path={<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></>} {...props} />,
+            Moon: (props) => <Icon path={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>} {...props} />,
+            Sun: (props) => <Icon path={<><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></>} {...props} />,
+            BarChart3: (props) => <Icon path={<><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></>} {...props} />,
+            Clock: (props) => <Icon path={<><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></>} {...props} />,
+            Flame: (props) => <Icon path={<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.243-2.053.75-2.85v-.05"></path>} {...props} />,
+            Footprints: (props) => <Icon path={<><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 11 3.8 11 8c0 2.85-1.67 5.14-2.5 7.42-1.37 3.76-3.8 6.58-4.5 6.58-.93 0-1.5-.9-1.5-2.3z"></path><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 13 7.8 13 12c0 2.85 1.67 5.14 2.5 7.42 1.37 3.76 3.8 6.58 4.5 6.58.93 0 1.5-.9 1.5-2.3z"></path></>} {...props} />,
+            Calendar: (props) => <Icon path={<><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></>} {...props} />,
+            Home: (props) => <Icon path={<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></>} {...props} />,
+            ChevronLeft: (props) => <Icon path={<polyline points="15 18 9 12 15 6"></polyline>} {...props} />,
+            ChevronRight: (props) => <Icon path={<polyline points="9 18 15 12 9 6"></polyline>} {...props} />,
+            X: (props) => <Icon path={<><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></>} {...props} />
+        };
+
+        // --- 設定與資料結構 ---
+        const TARGET_BPM = 180;
+        const BEAT_INTERVAL = 60000 / TARGET_BPM; 
+
+        // ==========================================
+        // ★★★ 圖片連結設定區 ★★★
+        // 請在此處替換為您喜歡的 Snoopy 圖片網址 (URL)
+        // ==========================================
+        const INITIAL_USERS = [
+            { 
+                id: 'A', 
+                name: '爸爸', 
+                role: 'Snoopy',
+                // 建議圖片：https://i.pinimg.com/1200x/7f/b2/28/7fb2283db4278e70277ef801f42aed27.jpg
+                avatar: 'https://i.pinimg.com/1200x/7f/b2/28/7fb2283db4278e70277ef801f42aed27.jpg', 
+                theme: 'blue', 
+                totalTime: 0, 
+                totalSteps: 0 
+            },
+            { 
+                id: 'B', 
+                name: '媽媽', 
+                role: 'Belle',
+                // 建議圖片：https://i.pinimg.com/1200x/b6/d5/03/b6d5038fb18cb33f5dfbfbdd85558727.jpg
+                avatar: 'https://i.pinimg.com/1200x/b6/d5/03/b6d5038fb18cb33f5dfbfbdd85558727.jpg', 
+                theme: 'rose', 
+                totalTime: 0, 
+                totalSteps: 0 
+            },
+            { 
+                id: 'C', 
+                name: '奶奶', 
+                role: 'Woodstock',
+                // 建議圖片：https://i.pinimg.com/736x/bd/f5/30/bdf530ea6716bbf1d2db986fee7018cb.jpg
+                avatar: 'https://i.pinimg.com/736x/bd/f5/30/bdf530ea6716bbf1d2db986fee7018cb.jpg', 
+                theme: 'amber', 
+                totalTime: 0, 
+                totalSteps: 0 
+            },
+        ];
+
+        const THEMES = {
+            blue: { light: 'bg-blue-500', dark: 'bg-blue-600', text: 'text-blue-600', darkText: 'text-blue-400', ring: 'ring-blue-500', hex: '#3b82f6', gradient: 'from-blue-500 to-cyan-500' },
+            rose: { light: 'bg-rose-500', dark: 'bg-rose-600', text: 'text-rose-600', darkText: 'text-rose-400', ring: 'ring-rose-500', hex: '#e11d48', gradient: 'from-rose-500 to-pink-500' },
+            amber: { light: 'bg-amber-500', dark: 'bg-amber-600', text: 'text-amber-600', darkText: 'text-amber-400', ring: 'ring-amber-500', hex: '#d97706', gradient: 'from-amber-500 to-orange-500' },
+        };
+
+        const FAMILY_GOAL_MINUTES = 1000;
+
+        // --- 輔助函式 ---
+        const playBeep = (audioCtxRef) => {
+            if (!audioCtxRef.current) return;
+            try {
+                const oscillator = audioCtxRef.current.createOscillator();
+                const gainNode = audioCtxRef.current.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, audioCtxRef.current.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(0.01, audioCtxRef.current.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.3, audioCtxRef.current.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtxRef.current.currentTime + 0.1);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtxRef.current.destination);
+                oscillator.start();
+                oscillator.stop(audioCtxRef.current.currentTime + 0.1);
+            } catch (e) { console.error("Audio error", e); }
+        };
+
+        const formatTime = (seconds) => {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        };
+
+        const getTodayString = () => {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
+        // --- 主程式 ---
+        function SlowJoggingApp() {
+            // State
+            const [darkMode, setDarkMode] = useState(false);
+            const [view, setView] = useState('home'); 
+            const [currentUser, setCurrentUser] = useState(null);
+            const [users, setUsers] = useState(INITIAL_USERS);
+            const [history, setHistory] = useState([]); 
+            
+            const [currentMonth, setCurrentMonth] = useState(() => {
+                const today = new Date();
+                return new Date(today.getFullYear(), today.getMonth(), 1);
+            });
+            const [selectedDate, setSelectedDate] = useState(null);
+
+            const [runTime, setRunTime] = useState(0);
+            const [isMuted, setIsMuted] = useState(false);
+            const [isBeatVisible, setIsBeatVisible] = useState(false);
+            const [stopPressProgress, setStopPressProgress] = useState(0);
+
+            const [steps, setSteps] = useState(0);
+            const [isSensorActive, setIsSensorActive] = useState(false);
+            
+            const stopTimerRef = useRef(null);
+            const audioCtxRef = useRef(null);
+            const timerRef = useRef(null);
+            const beatTimerRef = useRef(null);
+            const lastStepTime = useRef(0);
+            
+            // Initialization
+            useEffect(() => {
+                const savedUsers = localStorage.getItem('slowJoggingUsers');
+                if (savedUsers) {
+                    const parsedSavedUsers = JSON.parse(savedUsers);
+                    const mergedUsers = INITIAL_USERS.map(initUser => {
+                        const savedUser = parsedSavedUsers.find(u => u.id === initUser.id);
+                        // Ensure we use the new avatars even if loading from local storage
+                        return savedUser ? { 
+                            ...savedUser, 
+                            name: initUser.name, 
+                            avatar: initUser.avatar,
+                            role: initUser.role 
+                        } : initUser;
+                    });
+                    setUsers(mergedUsers);
+                } else {
+                    setUsers(INITIAL_USERS);
+                }
+                
+                const savedHistory = localStorage.getItem('slowJoggingHistory');
+                if (savedHistory) setHistory(JSON.parse(savedHistory));
+
+                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    setDarkMode(true);
+                }
+            }, []);
+
+            useEffect(() => {
+                if (darkMode) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }, [darkMode]);
+
+            const saveToLocal = (updatedUsers, updatedHistory) => {
+                localStorage.setItem('slowJoggingUsers', JSON.stringify(updatedUsers));
+                if (updatedHistory) {
+                    localStorage.setItem('slowJoggingHistory', JSON.stringify(updatedHistory));
+                    setHistory(updatedHistory);
+                }
+                setUsers(updatedUsers);
+            };
+
+            const toggleDarkMode = () => setDarkMode(!darkMode);
+
+            const selectUser = (user) => {
+                setCurrentUser(user);
+                if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                setView('running_prep');
+            };
+
+            const handleMotion = useCallback((event) => {
+                const acc = event.accelerationIncludingGravity;
+                if (!acc) return;
+                const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+                const THRESHOLD = 12.0; 
+
+                if (magnitude > THRESHOLD) {
+                    const now = Date.now();
+                    if (now - lastStepTime.current > 250) {
+                        setSteps(prev => prev + 1);
+                        lastStepTime.current = now;
+                        setIsSensorActive(true);
+                    }
+                }
+            }, []);
+
+            const startRun = async () => {
+                setRunTime(0);
+                setSteps(0);
+                setIsSensorActive(false);
+                lastStepTime.current = 0;
+
+                if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                    try {
+                        await DeviceMotionEvent.requestPermission();
+                    } catch (e) { console.error(e); }
+                }
+
+                setView('running');
+                if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
+
+                timerRef.current = setInterval(() => setRunTime(prev => prev + 1), 1000);
+                beatTimerRef.current = setInterval(() => {
+                    setIsBeatVisible(true);
+                    setTimeout(() => setIsBeatVisible(false), 100);
+                    if (!isMuted) playBeep(audioCtxRef);
+                }, BEAT_INTERVAL);
+            };
+
+            useEffect(() => {
+                if (view === 'running') {
+                    window.addEventListener('devicemotion', handleMotion);
+                    return () => window.removeEventListener('devicemotion', handleMotion);
+                }
+            }, [view, handleMotion]);
+
+            const stopRun = useCallback(() => {
+                clearInterval(timerRef.current);
+                clearInterval(beatTimerRef.current);
+                
+                const estimatedSteps = Math.floor((runTime / 60) * 180);
+                const finalSteps = (isSensorActive && steps > 10) ? steps : estimatedSteps;
+
+                const updatedUsers = users.map(u => {
+                    if (u.id === currentUser.id) {
+                        return { ...u, totalTime: u.totalTime + runTime, totalSteps: u.totalSteps + finalSteps };
+                    }
+                    return u;
+                });
+
+                const newRecord = {
+                    date: getTodayString(),
+                    userId: currentUser.id,
+                    duration: runTime,
+                    steps: finalSteps
+                };
+                const updatedHistory = [...history, newRecord];
+
+                saveToLocal(updatedUsers, updatedHistory);
+                
+                if (!isSensorActive || steps <= 10) {
+                    setSteps(estimatedSteps); 
+                }
+
+                setView('summary');
+            }, [runTime, users, currentUser, isMuted, isSensorActive, steps, history]);
+
+            const handleStopPressStart = () => {
+                let progress = 0;
+                stopTimerRef.current = setInterval(() => {
+                    progress += 2;
+                    setStopPressProgress(progress);
+                    if (progress >= 100) {
+                        clearInterval(stopTimerRef.current);
+                        stopRun();
+                    }
+                }, 20);
+            };
+            const handleStopPressEnd = () => {
+                clearInterval(stopTimerRef.current);
+                setStopPressProgress(0);
+            };
+
+            const totalFamilyTime = users.reduce((acc, user) => acc + user.totalTime, 0);
+            const totalFamilyMinutes = Math.floor(totalFamilyTime / 60);
+            const goalPercent = Math.min((totalFamilyMinutes / FAMILY_GOAL_MINUTES) * 100, 100);
+
+            const prevMonth = () => {
+                setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+            };
+            const nextMonth = () => {
+                setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+            };
+
+            // --- Layout Components ---
+            const BottomNav = () => {
+                if (['running', 'running_prep', 'summary'].includes(view)) return null;
+
+                return (
+                    <div className={`fixed bottom-0 w-full max-w-md ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'} border-t h-16 flex items-center justify-around z-30 transition-colors`}>
+                        <button 
+                            onClick={() => setView('home')}
+                            className={`flex flex-col items-center justify-center w-full h-full ${view === 'home' ? (darkMode ? 'text-indigo-400' : 'text-indigo-600') : (darkMode ? 'text-slate-500' : 'text-gray-400')}`}
+                        >
+                            <Icons.Home size={24} />
+                            <span className="text-xs mt-1 font-medium">首頁</span>
+                        </button>
+                        <button 
+                            onClick={() => setView('calendar')}
+                            className={`flex flex-col items-center justify-center w-full h-full ${view === 'calendar' ? (darkMode ? 'text-indigo-400' : 'text-indigo-600') : (darkMode ? 'text-slate-500' : 'text-gray-400')}`}
+                        >
+                            <Icons.Calendar size={24} />
+                            <span className="text-xs mt-1 font-medium">日曆</span>
+                        </button>
+                    </div>
+                );
+            };
+
+            const DateDetailsModal = () => {
+                if (!selectedDate) return null;
+                const records = history.filter(r => r.date === selectedDate);
+                const totalDuration = records.reduce((acc, r) => acc + r.duration, 0);
+                const totalSteps = records.reduce((acc, r) => acc + r.steps, 0);
+
+                return (
+                    <div 
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+                        onClick={() => setSelectedDate(null)}
+                    >
+                        <div 
+                            className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl relative transition-colors ${darkMode ? 'bg-slate-800 text-slate-100' : 'bg-white text-gray-800'}`}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex justify-between items-center mb-6 border-b pb-4 border-gray-200/20">
+                                <div>
+                                    <h3 className="text-2xl font-bold font-mono">{selectedDate}</h3>
+                                    <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                                        單日總計：{Math.floor(totalDuration/60)}分 / {totalSteps}步
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={() => setSelectedDate(null)} 
+                                    className={`p-2 rounded-full ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`}
+                                >
+                                    <Icons.X size={24}/>
+                                </button>
+                            </div>
+                            <div className="space-y-4 max-h-[60vh] overflow-y-auto no-scrollbar">
+                                {records.length === 0 ? (
+                                    <div className="text-center py-8 opacity-60 flex flex-col items-center">
+                                        <div className="text-4xl mb-2">😴</div>
+                                        <p>這一天大家都休息喔</p>
+                                    </div>
+                                ) : (
+                                    records.map((record, idx) => {
+                                        const user = users.find(u => u.id === record.userId);
+                                        const safeUser = user || { name: '未知成員', theme: 'blue', avatar: '', role: '' };
+                                        const theme = THEMES[safeUser.theme];
+
+                                        return (
+                                            <div key={idx} className={`flex items-center p-4 rounded-2xl border transition-all ${darkMode ? 'border-slate-700 bg-slate-700/30' : 'border-gray-100 bg-gray-50'}`}>
+                                                <div className="w-14 h-14 rounded-full overflow-hidden mr-4 border-2 border-white/20 shadow-md bg-white">
+                                                    <img 
+                                                        src={safeUser.avatar} 
+                                                        alt={safeUser.role} 
+                                                        className="w-full h-full object-cover" 
+                                                        onError={(e) => {
+                                                            // Fallback to emoji if image fails
+                                                            e.target.style.display = 'none';
+                                                            e.target.parentNode.innerText = '🐶';
+                                                            e.target.parentNode.style.display = 'flex';
+                                                            e.target.parentNode.style.justifyContent = 'center';
+                                                            e.target.parentNode.style.alignItems = 'center';
+                                                            e.target.parentNode.style.fontSize = '1.5rem';
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className="font-bold text-lg">{safeUser.name}</span>
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${darkMode ? 'bg-slate-600' : 'bg-white border border-gray-200'}`}>
+                                                            {idx + 1}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center space-x-4 text-sm opacity-80">
+                                                        <div className="flex items-center">
+                                                            <Icons.Clock size={14} className={`mr-1.5 ${theme.text}`} /> 
+                                                            <span className="font-mono">{formatTime(record.duration)}</span>
+                                                        </div>
+                                                        <div className="flex items-center">
+                                                            <Icons.Footprints size={14} className={`mr-1.5 ${theme.text}`} /> 
+                                                            <span className="font-mono">{record.steps} 步</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const Container = ({ children }) => (
+                <div className={`min-h-screen font-sans ${darkMode ? 'bg-slate-900 text-slate-100' : 'bg-gray-50 text-gray-800'}`}>
+                    <div className="max-w-md mx-auto min-h-screen flex flex-col relative shadow-2xl overflow-hidden pb-16 transition-colors duration-300">
+                        <div className={`flex justify-between items-center p-4 ${darkMode ? 'bg-slate-800/50' : 'bg-white/80'} backdrop-blur-sm sticky top-0 z-20`}>
+                            <div className="flex items-center space-x-2">
+                                <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${currentUser ? THEMES[currentUser.theme].gradient : 'from-indigo-500 to-purple-500'} flex items-center justify-center text-white font-bold`}>
+                                    S
+                                </div>
+                                <span className="font-bold text-lg tracking-tight">Snoopy 家庭超慢跑</span>
+                            </div>
+                            <button 
+                                onClick={toggleDarkMode}
+                                className={`p-2 rounded-full transition-colors ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-yellow-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}
+                            >
+                                {darkMode ? <Icons.Sun size={20} /> : <Icons.Moon size={20} />}
+                            </button>
+                        </div>
+                        <div className="flex-1 flex flex-col relative overflow-y-auto no-scrollbar">
+                            {children}
+                        </div>
+                        <BottomNav />
+                        <DateDetailsModal />
+                    </div>
+                </div>
+            );
+
+            // --- Views ---
+
+            const renderHome = () => (
+                <div className="p-6 space-y-8 flex-1 flex flex-col">
+                    <div className="space-y-1">
+                        <h2 className="text-2xl font-bold">歡迎回來</h2>
+                        <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>保持 180 BPM，和 Snoopy 一起運動！</p>
+                    </div>
+
+                    <div className={`p-5 rounded-2xl relative overflow-hidden ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white shadow-lg shadow-indigo-100/50'}`}>
+                        <div className="flex justify-between items-end mb-4 relative z-10">
+                            <div>
+                                <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-gray-400'}`}>全家目標進度</p>
+                                <div className="flex items-baseline space-x-1">
+                                    <span className="text-3xl font-bold font-mono">{totalFamilyMinutes}</span>
+                                    <span className="text-sm text-gray-500">/ {FAMILY_GOAL_MINUTES} 分</span>
+                                </div>
+                            </div>
+                            <div className={`h-10 w-10 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-700 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                                <Icons.Trophy size={20} />
+                            </div>
+                        </div>
+                        <div className={`w-full h-2 rounded-full mb-1 ${darkMode ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                            <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-1000" style={{ width: `${goalPercent}%` }}></div>
+                        </div>
+                        <p className="text-right text-xs text-indigo-500 font-medium">{Math.floor(goalPercent)}% 達成</p>
+                    </div>
+
+                    <div>
+                        <h3 className={`text-sm font-semibold mb-4 ${darkMode ? 'text-slate-400' : 'text-gray-400'}`}>選擇使用者</h3>
+                        <div className="grid grid-cols-1 gap-4">
+                            {users.map(user => (
+                                <button
+                                    key={user.id}
+                                    onClick={() => selectUser(user)}
+                                    className={`group relative p-4 rounded-xl flex items-center transition-all duration-200 border
+                                        ${darkMode 
+                                            ? 'bg-slate-800 border-slate-700 hover:bg-slate-750 hover:border-slate-600' 
+                                            : 'bg-white border-gray-100 hover:border-indigo-100 shadow-sm hover:shadow-md'
+                                        }`}
+                                >
+                                    <div className={`w-16 h-16 rounded-full bg-white overflow-hidden border-2 ${darkMode ? 'border-slate-600' : 'border-white'} shadow-sm group-hover:scale-105 transition-transform flex items-center justify-center`}>
+                                        <img 
+                                            src={user.avatar} 
+                                            alt={user.name} 
+                                            className="w-full h-full object-cover" 
+                                            onError={(e) => {
+                                                e.target.style.display = 'none';
+                                                e.target.parentNode.innerText = '🐶';
+                                                e.target.parentNode.style.fontSize = '2rem';
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="ml-4 text-left flex-1">
+                                        <span className={`block font-bold text-lg ${darkMode ? 'text-slate-200' : 'text-gray-800'}`}>{user.name}</span>
+                                        <div className="flex items-center space-x-3 text-xs opacity-70">
+                                            <span className="flex items-center"><Icons.Clock size={12} className="mr-1"/> {Math.floor(user.totalTime/60)}分</span>
+                                            <span className="flex items-center"><Icons.Flame size={12} className="mr-1"/> {user.totalSteps}步</span>
+                                        </div>
+                                    </div>
+                                    <div className={`p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity ${darkMode ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                                        <Icons.Play size={16} className={darkMode ? 'text-white' : 'text-gray-600'} fill={darkMode ? "white" : "currentColor"} />
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const renderCalendar = () => {
+                const year = currentMonth.getFullYear();
+                const month = currentMonth.getMonth();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const firstDayOfMonth = new Date(year, month, 1).getDay();
+                const blanks = Array(firstDayOfMonth).fill(null);
+                const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+                const getRingStyle = (dateStr) => {
+                    const records = history.filter(r => r.date === dateStr);
+                    const userIds = [...new Set(records.map(r => r.userId))];
+                    if (userIds.length === 0) return {};
+
+                    const colors = userIds.map(uid => {
+                        const user = users.find(u => u.id === uid);
+                        // 防呆：如果找不到使用者，給一個預設顏色
+                        return user ? THEMES[user.theme].hex : '#999';
+                    });
+
+                    if (colors.length === 1) {
+                        return { border: `3px solid ${colors[0]}` };
+                    } else {
+                        const segmentSize = 360 / colors.length;
+                        const gradientParts = colors.map((color, index) => 
+                            `${color} ${index * segmentSize}deg ${(index + 1) * segmentSize}deg`
+                        ).join(', ');
+                        
+                        return {
+                            background: `conic-gradient(${gradientParts})`,
+                            WebkitMask: 'radial-gradient(transparent 60%, black 61%)',
+                            mask: 'radial-gradient(transparent 60%, black 61%)'
+                        };
+                    }
+                };
+
+                return (
+                    <div className="p-6 flex-1 flex flex-col">
+                        <div className="flex justify-between items-center mb-6">
+                            <button onClick={prevMonth} className={`p-2 rounded-full ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`}><Icons.ChevronLeft /></button>
+                            <h2 className="text-xl font-bold font-mono">{year} 年 {month + 1} 月</h2>
+                            <button onClick={nextMonth} className={`p-2 rounded-full ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`}><Icons.ChevronRight /></button>
+                        </div>
+                        <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                            {['日', '一', '二', '三', '四', '五', '六'].map(d => (
+                                <div key={d} className={`text-xs font-bold ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>{d}</div>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-7 gap-2">
+                            {blanks.map((_, i) => <div key={`blank-${i}`} className="aspect-square"></div>)}
+                            {days.map(d => {
+                                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                                const style = getRingStyle(dateStr);
+                                const hasRecord = history.some(r => r.date === dateStr);
+                                const isMultiUser = style.background && style.background.includes('conic-gradient');
+
+                                return (
+                                    <button 
+                                        key={d} 
+                                        onClick={() => setSelectedDate(dateStr)}
+                                        className={`aspect-square relative flex items-center justify-center rounded-xl transition-colors ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-gray-100'}`}
+                                    >
+                                        {hasRecord && (
+                                            <div className="absolute inset-0 rounded-full" style={isMultiUser ? style : {}} />
+                                        )}
+                                        {hasRecord && !isMultiUser && (
+                                            <div className="absolute inset-0 rounded-full" style={style} />
+                                        )}
+                                        <span className={`relative z-10 text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                                            {d}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-8 space-y-2">
+                            <p className={`text-sm font-bold ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>運動紀錄</p>
+                            <div className="flex space-x-4">
+                                {users.map(u => (
+                                    <div key={u.id} className="flex items-center space-x-2">
+                                        <div className={`w-6 h-6 rounded-full overflow-hidden border border-white/50 bg-white flex items-center justify-center`}>
+                                             <img 
+                                                src={u.avatar} 
+                                                className="w-full h-full object-cover" 
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    e.target.parentNode.innerText = '🐶';
+                                                    e.target.parentNode.style.fontSize = '0.8rem';
+                                                }}
+                                             />
+                                        </div>
+                                        <span className={`text-xs ${darkMode ? 'text-slate-300' : 'text-gray-600'}`}>{u.name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <p className={`text-center text-xs mt-6 ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>點擊日期可查看詳細資訊</p>
+                    </div>
+                );
+            };
+
+            const renderRunningPrep = () => {
+                const theme = THEMES[currentUser.theme];
+                return (
+                    <div className="flex-1 flex flex-col justify-center items-center p-8 space-y-10">
+                        <div className="text-center space-y-2">
+                            <div className={`w-32 h-32 mx-auto rounded-full bg-white flex items-center justify-center shadow-lg shadow-${currentUser.theme}-500/30 mb-6 overflow-hidden border-4 border-${currentUser.theme}-100`}>
+                                 <img 
+                                    src={currentUser.avatar} 
+                                    alt={currentUser.role} 
+                                    className="w-full h-full object-cover" 
+                                    onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        e.target.parentNode.innerText = '🐶';
+                                        e.target.parentNode.style.fontSize = '4rem';
+                                    }}
+                                 />
+                            </div>
+                            <h2 className="text-3xl font-bold">{currentUser.name}，準備好了嗎？</h2>
+                            <p className={`text-lg ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                                手機請<span className="font-bold text-indigo-500">握在手中</span>或<span className="font-bold text-indigo-500">放口袋</span>以記錄步數。
+                            </p>
+                        </div>
+                        <div className={`w-full rounded-2xl p-6 ${darkMode ? 'bg-slate-800' : 'bg-white shadow-lg border border-gray-100'}`}>
+                            <div className="flex items-start space-x-3 mb-4">
+                                <Icons.CheckCircle className={`mt-1 ${theme.text}`} size={20} />
+                                <div>
+                                    <h4 className="font-bold">正確姿勢</h4>
+                                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>背部挺直，前腳掌著地，膝蓋微彎。</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="w-full space-y-3">
+                            <button
+                                onClick={startRun}
+                                className={`w-full py-4 rounded-xl bg-gradient-to-r ${theme.gradient} text-white text-xl font-bold shadow-lg shadow-${currentUser.theme}-500/25 active:scale-95 transition-all flex items-center justify-center`}
+                            >
+                                <Icons.Play fill="white" className="mr-2" /> 開始並授權計步
+                            </button>
+                            <button
+                                onClick={() => setView('home')}
+                                className={`w-full py-4 rounded-xl font-medium ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-gray-500 hover:bg-gray-100'}`}
+                            >
+                                稍後再跑
+                            </button>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderRunning = () => {
+                const theme = THEMES[currentUser.theme];
+                const showRealSteps = isSensorActive && steps > 5;
+                const displaySteps = showRealSteps ? steps : Math.floor((runTime / 60) * 180);
+
+                return (
+                    <div className="flex-1 flex flex-col relative overflow-hidden">
+                        <div 
+                            className={`absolute inset-0 pointer-events-none transition-colors duration-100 ${darkMode ? 'bg-slate-800' : 'bg-gray-100'}`}
+                            style={{ opacity: isBeatVisible ? (darkMode ? 0.3 : 0.5) : 0 }}
+                        />
+                        <div className="relative z-10 px-6 pt-4 flex justify-between items-center">
+                            <div className="flex items-center space-x-2">
+                                <div className={`w-2 h-2 rounded-full ${isBeatVisible ? 'bg-green-500' : 'bg-gray-400'} transition-colors`}></div>
+                                <span className={`text-sm font-mono ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>180 BPM</span>
+                            </div>
+                            <button 
+                                onClick={() => setIsMuted(!isMuted)}
+                                className={`px-3 py-1 rounded-full text-xs font-medium border ${darkMode ? 'border-slate-600 text-slate-300' : 'border-gray-200 text-gray-600 bg-white'}`}
+                            >
+                                {isMuted ? '靜音中' : '聲音開啟'}
+                            </button>
+                        </div>
+                        <div className="flex-1 z-10 flex flex-col items-center justify-center space-y-8">
+                            <div className={`relative w-72 h-72 rounded-full border-4 flex items-center justify-center transition-all duration-100 
+                                ${isBeatVisible 
+                                    ? `${darkMode ? 'border-slate-600 scale-105 shadow-2xl shadow-green-500/10' : 'border-gray-300 scale-105 shadow-xl'}` 
+                                    : `${darkMode ? 'border-slate-800' : 'border-gray-100'}`
+                                }
+                                ${darkMode ? 'bg-slate-900' : 'bg-white'}
+                            `}>
+                                <div className="absolute inset-2 border border-dashed border-gray-700/20 rounded-full animate-spin-slow" style={{ animationDuration: '60s' }}></div>
+                                <div className="text-center z-20">
+                                    <span className={`block text-7xl font-mono font-bold tracking-tight ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                        {formatTime(runTime)}
+                                    </span>
+                                    <span className={`text-sm font-medium mt-2 block ${theme.darkText}`}>
+                                        時間
+                                    </span>
+                                </div>
+                                {/* Background Avatar Opacity */}
+                                <div className="absolute inset-0 rounded-full overflow-hidden opacity-10 pointer-events-none bg-white">
+                                     <img 
+                                        src={currentUser.avatar} 
+                                        className="w-full h-full object-cover grayscale opacity-20" 
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                        }}
+                                     />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-8 w-full max-w-xs px-4">
+                                <div className="text-center">
+                                    <p className={`text-xs uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                                        {showRealSteps ? "實際步數" : "預估步數"}
+                                    </p>
+                                    <p className={`text-2xl font-bold font-mono ${darkMode ? 'text-slate-300' : 'text-gray-600'} transition-all duration-300`}>
+                                        {displaySteps}
+                                    </p>
+                                    {!showRealSteps && (
+                                        <p className="text-[10px] text-gray-400">(偵測中...)</p>
+                                    )}
+                                </div>
+                                <div className="text-center">
+                                    <p className={`text-xs uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>目前消耗</p>
+                                    <p className={`text-2xl font-bold font-mono ${darkMode ? 'text-slate-300' : 'text-gray-600'}`}>~{Math.floor(runTime / 60 * 5)} <span className="text-sm">cal</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 pb-8 z-10">
+                            <button
+                                onMouseDown={handleStopPressStart}
+                                onMouseUp={handleStopPressEnd}
+                                onMouseLeave={handleStopPressEnd}
+                                onTouchStart={handleStopPressStart}
+                                onTouchEnd={handleStopPressEnd}
+                                className={`group w-full relative overflow-hidden rounded-xl py-4 shadow-lg select-none touch-none transition-all
+                                    ${darkMode ? 'bg-red-900/50 text-red-200' : 'bg-red-50 text-red-600'}`}
+                            >
+                                <div 
+                                    className="absolute left-0 top-0 bottom-0 bg-red-500 transition-all duration-75 opacity-20"
+                                    style={{ width: `${stopPressProgress}%` }}
+                                />
+                                <div className="flex items-center justify-center space-x-2 relative z-10">
+                                    <Icons.Square size={20} fill="currentColor" />
+                                    <span className="font-bold text-lg">長按結束運動</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderSummary = () => {
+                const sessionMinutes = Math.floor(runTime / 60);
+                const theme = THEMES[currentUser.theme];
+                return (
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 animate-fade-in">
+                        <div className="w-full max-w-sm space-y-8 text-center">
+                            <div className="relative inline-block">
+                                <div className={`w-32 h-32 mx-auto rounded-full bg-gradient-to-tr ${theme.gradient} flex items-center justify-center shadow-xl shadow-${currentUser.theme}-500/40 mb-4 animate-bounce`}>
+                                    <Icons.Trophy size={48} className="text-white" strokeWidth={1.5} />
+                                </div>
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-bold mb-2">運動完成！</h2>
+                                <p className={darkMode ? 'text-slate-400' : 'text-gray-500'}>很棒的節奏，身體感覺如何？</p>
+                            </div>
+                            <div className={`grid grid-cols-2 gap-4 ${darkMode ? 'text-slate-200' : 'text-gray-700'}`}>
+                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-slate-800' : 'bg-white shadow-sm border border-gray-100'}`}>
+                                    <div className="text-xs text-gray-400 mb-1">總時間</div>
+                                    <div className="text-2xl font-mono font-bold">{formatTime(runTime)}</div>
+                                </div>
+                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-slate-800' : 'bg-white shadow-sm border border-gray-100'}`}>
+                                    <div className="flex items-center justify-center space-x-1 text-xs text-gray-400 mb-1">
+                                        <span>本次步數</span>
+                                        {isSensorActive ? <Icons.Footprints size={10} className="text-green-500"/> : <Icons.Clock size={10}/>}
+                                    </div>
+                                    <div className="text-2xl font-mono font-bold">{steps}</div>
+                                </div>
+                            </div>
+                            <div className={`rounded-xl p-4 flex items-center justify-center space-x-3 ${darkMode ? 'bg-slate-800/50 text-indigo-300' : 'bg-indigo-50 text-indigo-700'}`}>
+                                <Icons.BarChart3 size={20} />
+                                <span className="font-medium">本次貢獻 {sessionMinutes} 分鐘</span>
+                            </div>
+                            <button
+                                onClick={() => setView('home')}
+                                className={`w-full py-4 rounded-xl font-bold text-lg transition-all shadow-lg active:scale-95
+                                    ${darkMode 
+                                        ? 'bg-white text-slate-900 hover:bg-gray-100' 
+                                        : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+                            >
+                                完成
+                            </button>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <Container>
+                    {view === 'home' && renderHome()}
+                    {view === 'calendar' && renderCalendar()}
+                    {view === 'running_prep' && renderRunningPrep()}
+                    {view === 'running' && renderRunning()}
+                    {view === 'summary' && renderSummary()}
+                </Container>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<SlowJoggingApp />);
+    </script>
+</body>
+</html>
